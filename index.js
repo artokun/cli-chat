@@ -42,13 +42,12 @@ firebase.auth().onAuthStateChanged(function(firebaseUser) {
       });
     db
       .collection('messages')
-      .orderBy('createdAt')
+      .orderBy('createdAt', 'desc')
+      .limit(15)
       .onSnapshot(snap => {
-        clear();
-        let string = '';
+        let string = [];
         snap.forEach(doc => {
-          string =
-            string + doc.data().username + ': ' + doc.data().message + '\n';
+          string.push(doc.data().username + ': ' + doc.data().message);
         });
         snap.docChanges.forEach(change => {
           if (change.type === 'added') {
@@ -59,7 +58,8 @@ firebase.auth().onAuthStateChanged(function(firebaseUser) {
             });
           }
         });
-        instance.log(string);
+        clear();
+        instance.log(string.reverse().join('\n'));
       });
   } else {
     user = { uid: '', username: 'anonymous' };
