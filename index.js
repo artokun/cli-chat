@@ -46,7 +46,8 @@ firebase.auth().onAuthStateChanged(function(firebaseUser) {
         clear();
         let string = '';
         snap.forEach(doc => {
-          string = string + user.username + ': ' + doc.data().message + '\n';
+          string =
+            string + doc.data().username + ': ' + doc.data().message + '\n';
         });
         instance.log(string);
       });
@@ -62,6 +63,7 @@ vorpal
   .command('/login')
   .description('Log in')
   .action(function(args) {
+    instance = this;
     return inquirer
       .prompt([
         {
@@ -81,7 +83,6 @@ vorpal
           .signInWithEmailAndPassword(email, password)
           .then(firebaseUser => {
             this.log('Successfully Logged in.');
-            instance = this;
           })
           .catch(error => {
             var errorCode = error.code;
@@ -99,6 +100,7 @@ vorpal
   .command('/register')
   .description('Register')
   .action(function(args) {
+    instance = this;
     return inquirer
       .prompt([
         {
@@ -152,7 +154,11 @@ vorpal.catch('[words...]', 'Chat').action(function(args, cb) {
   return firebase
     .firestore()
     .collection('messages')
-    .add({ message: args.words.join(' '), createdAt: Date.now() });
+    .add({
+      message: args.words.join(' '),
+      createdAt: Date.now(),
+      username: user.username,
+    });
 });
 
 // show
