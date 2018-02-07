@@ -13,6 +13,7 @@
     "clui": "^0.3.6",
     "firebase": "^4.9.1",
     "inquirer": "^5.1.0",
+    "node-notifier": "^5.2.1",
     "vorpal": "^1.12.0"
   }
 }

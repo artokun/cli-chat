@@ -2,6 +2,7 @@ const vorpal = require('vorpal')();
 const firebase = require('firebase');
 const inquirer = require('inquirer');
 const clear = require('clui').Clear;
+const notifier = require('node-notifier');
 require('firebase/firestore');
 
 const config = {
@@ -48,6 +49,15 @@ firebase.auth().onAuthStateChanged(function(firebaseUser) {
         snap.forEach(doc => {
           string =
             string + doc.data().username + ': ' + doc.data().message + '\n';
+        });
+        snap.docChanges.forEach(change => {
+          if (change.type === 'added') {
+            const { username, message } = change.doc.data();
+            notifier.notify({
+              title: username + ' said...',
+              message: message,
+            });
+          }
         });
         instance.log(string);
       });
