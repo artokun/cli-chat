@@ -3,7 +3,17 @@ const firebase = require('firebase');
 const inquirer = require('inquirer');
 const clear = require('clui').Clear;
 const notifier = require('node-notifier');
+const Preferences = require('preferences');
+
 require('firebase/firestore');
+var prefs = new Preferences('com.cli-app', {
+  user: {
+    email: '',
+    password: '',
+    uid: '',
+    username: '',
+  },
+});
 
 const config = {
   apiKey: 'AIzaSyDNB0VRHot9Z3vxNBvxR9JDFIad2QbAY4Y',
@@ -16,15 +26,6 @@ const config = {
 firebase.initializeApp(config);
 const db = firebase.firestore();
 
-let user = {
-  uid: '',
-  username: 'anonymous',
-};
-
-let state = {
-  roomId: '',
-};
-
 let instance = null;
 
 firebase.auth().onAuthStateChanged(function(firebaseUser) {
@@ -34,11 +35,13 @@ firebase.auth().onAuthStateChanged(function(firebaseUser) {
       .doc(firebaseUser.uid)
       .get()
       .then(doc => {
-        user = {
+        prefs.user = {
+          ...prefs.user,
           uid: doc.id,
+          email: firebaseUser.email,
           username: doc.data().username,
         };
-        instance.delimiter('$cli-chat | ' + user.username + ':');
+        instance.delimiter('$cli-chat | ' + prefs.user.username + ':');
       });
     db
       .collection('messages')
@@ -70,16 +73,36 @@ firebase.auth().onAuthStateChanged(function(firebaseUser) {
 vorpal.command('/join').description('Choose a chat room');
 
 vorpal
-  .command('/login')
+  .command('/login [email] [password]')
   .description('Log in')
-  .action(function(args) {
+  .action(function({ email, password }) {
     instance = this;
+    if (email && password) {
+      return firebase
+        .auth()
+        .signInWithEmailAndPassword(email, password)
+        .then(firebaseUser => {
+          this.log('Successfully Logged in.');
+          prefs.user.password = password;
+          prefs.user.email = email;
+        })
+        .catch(error => {
+          var errorCode = error.code;
+
+          if (errorCode === 'auth/invalid-email') {
+            this.log(
+              '\n  Email and Password combination does not exist. Please register.\n'
+            );
+          }
+        });
+    }
     return inquirer
       .prompt([
         {
           type: 'input',
           name: 'email',
           message: 'Enter your email',
+          default: email,
         },
         {
           type: 'password',
@@ -88,11 +111,14 @@ vorpal
         },
       ])
       .then(({ email, password }) => {
+        console.log(email, password);
         firebase
           .auth()
           .signInWithEmailAndPassword(email, password)
           .then(firebaseUser => {
             this.log('Successfully Logged in.');
+            prefs.user.password = password;
+            prefs.user.email = email;
           })
           .catch(error => {
             var errorCode = error.code;
@@ -141,7 +167,10 @@ vorpal
           })
           .then(() => {
             this.log('Successfully Registered.');
-            this.delimiter('$cli-chat | ' + config.username + ':');
+            prefs.user.username = username;
+            prefs.user.password = password;
+            prefs.user.email = email;
+            this.delimiter('$cli-chat | ' + username + ':');
           })
           .catch(error => {
             var errorCode = error.code;
@@ -151,13 +180,13 @@ vorpal
   });
 
 vorpal.command('/user').action((args, cb) => {
-  console.log(JSON.stringify(user, null, 2));
+  console.log(JSON.stringify(prefs.user, null, 2));
   cb();
 });
 
 vorpal.catch('[words...]', 'Chat').action(function(args, cb) {
   instance = this;
-  if (!user.uid) {
+  if (!prefs.user.uid) {
     this.log('You need to `/login` or `/register` to chat');
     return cb();
   }
@@ -167,9 +196,22 @@ vorpal.catch('[words...]', 'Chat').action(function(args, cb) {
     .add({
       message: args.words.join(' '),
       createdAt: Date.now(),
-      username: user.username,
+      username: prefs.user.username,
     });
 });
+
+// attempt auto login
+if (prefs.user.email && prefs.user.password) {
+  vorpal.exec(
+    '/login ' + prefs.user.email + ' ' + prefs.user.password,
+    function(err) {
+      if (err) {
+        prefs.user.email = '';
+        prefs.user.password = '';
+      }
+    }
+  );
+}
 
 // show
 vorpal.delimiter('$cli-chat').show();
